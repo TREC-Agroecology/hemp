@@ -1,4 +1,4 @@
-Year,Month,Day,Block,Row,Column,Number of plants,Fresh weight (kg),Mass of leaves (g),Sample fresh weight (g),Sample dry weight (g)
+Year,Month,Day,Block,Row,Column,NumberOfPlants,FreshWeight_kg,MassOfLeaves_g,SampleFreshWeight_g,SampleDryWeight_g
 2019,8,29,1,1,C,30,4.1,591,336,
 2019,8,29,1,1,A,33,4,930,557,236
 2019,8,29,1,1,B,88,6,587,287,137

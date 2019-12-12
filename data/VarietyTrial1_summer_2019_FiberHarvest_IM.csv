@@ -1,4 +1,4 @@
-Year,Month,Day,Block,Row,Column,Rep,Height (mm),Diameter (cm),Sex
+Year,Month,Day,Block,Row,Column,Rep,Height_mm,Diameter_cm,Sex
 2019,9,12,9,1,A,1,238,13.4,M
 2019,9,12,9,1,A,2,200,9.5,V
 2019,9,12,9,1,A,3,205,14.6,V
