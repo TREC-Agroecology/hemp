@@ -59,7 +59,7 @@ summary(stand_count_test)
 HSD.test(stand_count_test, "Variety")$groups
 HSD.test(stand_count_test, "Experiment")$groups
 
-stand_count_summary_pilot <- stand_count_summary %>%
+stand_count_summary_pilot <- stand_count_pilot %>%
   filter(Variety %in% planting_date_varieties$Variety) %>% 
   filter(Day %in% c(NA, 7, 17)) %>% 
   left_join(planting_date_varieties, by = "Variety") %>%
@@ -68,14 +68,16 @@ stand_count_summary_pilot <- stand_count_summary %>%
                                               "BerryBlossom", "CherryBlossomxTI")),
          PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
-                               labels = c("May-1", "May-21", "June-21", "July-18")),
-    stand_percent = avg_stand_count/Rate_plot*100,
-    stand_percent_sd = sd_stand_count/Rate_plot*100)
+                               labels = c("May-1", "May-21", "June-21", "July-18"))) %>%
+  group_by(PlantingDate, Variety) %>% 
+  summarize(         
+    avg_stand_percent= mean(stand_percent, na.rm=TRUE),
+    sd_stand_percent = sd(stand_percent, na.rm=TRUE))
 
-ggplot(stand_count_summary_pilot, aes(x=PlantingDate, y=stand_percent)) +
+ggplot(stand_count_summary_pilot, aes(x=PlantingDate, y=avg_stand_percent)) +
   geom_bar(stat = "identity") +
   labs(x = "Planting Date", y = "Stand Establishment [% of live seed + SD]") +
-  geom_errorbar(aes(ymin = stand_percent, ymax = stand_percent+stand_percent_sd)) +
+  geom_errorbar(aes(ymin = avg_stand_percent, ymax = avg_stand_percent+sd_stand_percent)) +
   facet_grid(.~Variety) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
