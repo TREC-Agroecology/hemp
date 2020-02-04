@@ -4,7 +4,10 @@ library(agricolae)
 
 list.files("data/")
 
-dates <- read_csv("data/Trials_Dates.csv")
+dates <- read_csv("data/Trials_Dates.csv") %>% 
+  mutate(Experiment = factor(Experiment, levels = c("PilotPlot1", "VarietyTrial",
+                                                    "PilotPlot2", "PilotPlotPlus8"))) %>% 
+  arrange(Experiment)
 plots <- read_csv("data/PlotVarietyFile.csv")
 
 planting_date_varieties <- data.frame(
@@ -81,6 +84,7 @@ ggplot(stand_count_summary_pilot, aes(x=PlantingDate, y=avg_stand_percent)) +
   facet_grid(.~Variety) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/stand_count.png")
 
 stand_count_summary_variety <- stand_count_data %>%
   filter(Experiment == "VarietyTrial") %>% 
@@ -114,6 +118,16 @@ flower_induc_pilot <- flower_pilot %>%
   group_by(Experiment, Variety) %>%  
   summarize(induc_date = min(induc_date), avg_date = mean(induc_date))
 
+flower_induc_variety <- flower_data %>%
+  filter(Experiment == "VarietyTrial", Induc_perc >=80) %>%
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-"))) %>%
+  group_by(Variety, Block) %>% 
+  summarize(induc_date = min(Date)) %>%
+  group_by(Variety) %>%  
+  summarize(induc_date = min(induc_date)) %>% 
+  arrange(induc_date)
+write_csv(flower_induc_variety, "output/flower_induc_variety.csv")
+
 flower_female_pilot <- flower_pilot %>%
   filter(FemaleOpen_perc == 100) %>%
   group_by(Experiment, Variety) %>% 
@@ -138,6 +152,11 @@ for (experiment in dates$Experiment[1:2]){
   }
 }
 
+grain_dry_down <- grain_data %>%
+  filter(!is.na(GrainFreshWeight_g), !is.na(GrainDryWeight_g)) %>% 
+  mutate(dry_down_ratio = GrainDryWeight_g/GrainFreshWeight_g) %>% 
+  summarize(dry_down = mean(dry_down_ratio))
+
 grain_pilot <- grain_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(grain_harvest_lbsac = GrainDryWeight_g*8.92, # per g/m to lbs/ac
@@ -149,20 +168,21 @@ grain_summary <- grain_data %>%
          grain_fresh_lbsac = GrainFreshWeight_g*8.92) %>% 
   summarize(avg_grain_harvest = mean(grain_harvest_lbsac, na.rm=TRUE),
             sd_grain_harvest = sd(grain_harvest_lbsac, na.rm=TRUE),
-            avg_grain_fresh = mean(grain_fresh_lbsac, na.rm=TRUE),
-            sd_grain_fresh = sd(grain_fresh_lbsac, na.rm=TRUE)) %>% 
+            avg_grain_dry = mean(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down,
+            sd_grain_dry = sd(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down) %>% 
   mutate(PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial"),
                                labels = c("May-1", "May-21")))
         
 
-ggplot(grain_summary, aes(x=PlantingDate, y=avg_grain_fresh)) +
+ggplot(grain_summary, aes(x=PlantingDate, y=avg_grain_dry)) +
   geom_bar(stat = "identity") +
-  labs(x = "Planting Date", y = "Grain Fresh Wgt [lbs/ac + SD]") +
-  geom_errorbar(aes(ymin = avg_grain_fresh, ymax = avg_grain_fresh+sd_grain_fresh)) +
+  labs(x = "Planting Date", y = "Grain Dry Wgt [lbs/ac + SD]") +
+  geom_errorbar(aes(ymin = avg_grain_dry, ymax = avg_grain_dry+sd_grain_dry)) +
   facet_grid(.~Variety) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/grain_summary.png")
 
 ### Fiber Harvest
 for (experiment in dates$Experiment[1:2]){
@@ -206,3 +226,4 @@ ggplot(fiber_summary, aes(x=PlantingDate, y=avg_fiber_dry)) +
   facet_grid(.~Variety) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/fiber_summary.png")
