@@ -39,7 +39,7 @@ VarietyTrial,CarmagnolaSelezionata,A,2,5
 VarietyTrial,Joey,B,2,5
 VarietyTrial,CherryBlossomxTI,C,2,5
 VarietyTrial,BerryBlossom,D,2,5
-VarietyTrial,HanFN-H,A,3,5
+VarietyTrial,HanFNQ,A,3,5
 VarietyTrial,HanFN-H,B,3,5
 VarietyTrial,Carmagnola,C,3,5
 VarietyTrial,HanNW,D,3,5
@@ -59,7 +59,7 @@ VarietyTrial,HanNE,A,2,6
 VarietyTrial,Joey,B,2,6
 VarietyTrial,Si-1,C,2,6
 VarietyTrial,BerryBlossom,D,2,6
-VarietyTrial,HanFN-H,A,3,6
+VarietyTrial,HanFNQ,A,3,6
 VarietyTrial,Canda,B,3,6
 VarietyTrial,Bama,C,3,6
 VarietyTrial,Helena,D,3,6
@@ -76,7 +76,7 @@ VarietyTrial,HanNE,C,1,7
 VarietyTrial,Carmagnola,D,1,7
 VarietyTrial,HanNW,A,2,7
 VarietyTrial,HanFN-H,B,2,7
-VarietyTrial,HanFN-H,C,2,7
+VarietyTrial,HanFNQ,C,2,7
 VarietyTrial,CRS-1,D,2,7
 VarietyTrial,CFX-1,A,3,7
 VarietyTrial,CarmagnolaSelezionata,B,3,7
@@ -107,7 +107,7 @@ VarietyTrial,BerryBlossom,C,4,8
 VarietyTrial,CFX-2,D,4,8
 VarietyTrial,CFX-1,A,5,8
 VarietyTrial,Joey,B,5,8
-VarietyTrial,HanFN-H,C,5,8
+VarietyTrial,HanFNQ,C,5,8
 VarietyTrial,Puma-3,A,1,9
 VarietyTrial,Puma-4,B,1,9
 VarietyTrial,Fibranova,C,1,9
