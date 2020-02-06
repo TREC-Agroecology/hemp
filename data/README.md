@@ -3,6 +3,7 @@ Dates and season of each hemp trial conducted at TREC, Homestead, FL.
 - `PilotPlot1`; May 1st, 2019 (`Summer`)
 - `PilotPlot2`; June 21st, 2019 (`Summer`)
 - `VarietyTrial1`; May 22nd, 2019 (`Summer`)
+- `PilotPlotPlus8`; July 18th, 2019 (`Summer`)
 
 `PilotPlot1_summer_2019_Emergence.csv`: Emergence data of the first pilot plot.
 - `Block`: Block composed of 8 varieties, which was replicated 4 times
