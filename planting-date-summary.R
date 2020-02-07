@@ -19,22 +19,40 @@ planting_date_varieties <- data.frame(
              "Europe", "Europe", "Europe")
 )
 
-### Emergence Data  -  NOT COMPLETE
+### Emergence Data  - 
 emergence_data <- list()
 for (experiment in dates$Experiment){
   plot_varieties <- plots %>%
     filter(Experiment == experiment)
   emergence_file <- str_subset(list.files("data/"), paste0(experiment, ".*Emergence.*"))
-  emergence_data[[experiment]] <- read_csv(paste0("data/", emergence_file)) %>%
+  emergence_trial <- read_csv(paste0("data/", emergence_file)) %>%
     mutate(Date = ymd(paste(Year, Month, Day, sep = "-"))) %>%
     left_join(plot_varieties)
+  if (exists("emergence_data")){
+    emergence_data <- bind_rows(emergence_data, emergence_trial)
+  } else {
+    emergence_data <- emergence_trial
+  }
 }
 
-avg_emergence <- emergence_data[["PilotPlot1"]] %>%
-  group_by(Date, Variety) %>% 
+avg_emergence <- emergence_data %>%
+  group_by(Experiment, Variety, Date) %>% 
   summarize(avg_emergence = mean(Emergence, na.rm=TRUE)) %>% 
   left_join(select(planting_date_varieties, Variety, Rate_zone)) %>%
   mutate(percent_emergence = avg_emergence/Rate_zone*100)
+
+emergence_pilot <- avg_emergence %>% 
+  filter(Variety %in% planting_date_varieties$Variety) %>%
+  ungroup() %>% 
+  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                                              "BerryBlossom", "CherryBlossomxTI")))
+
+ggplot(emergence_pilot, aes(x=Date, y=avg_emergence, color=Variety)) +
+  geom_line() +
+  facet_grid(.~Experiment, scales = "free_x") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/emergence.png")
 
 ### Stand Count
 for (experiment in dates$Experiment){
