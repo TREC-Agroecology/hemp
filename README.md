@@ -1,3 +1,5 @@
+This is the organization and research for the UF/IFAS Industrial Hemp Pilot Project
+
 ## Hemp Metadata and Field Notes 
 Dates and season of each hemp trial conducted at TREC, Homestead, FL.
 - `PilotPlot1`; May 1st, 2019 (`Summer`)
