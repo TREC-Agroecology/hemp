@@ -126,18 +126,33 @@ for (experiment in dates$Experiment){
 
 flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
-  mutate(Date = ymd(paste(Year, Month, Day, sep="-"))) %>% 
-  arrange(desc(FemaleOpen_perc),  desc(MaleOpen_perc), Date, Variety)
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
+         PlantingDate = factor(Experiment, 
+                               levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
+                               labels = c("May-1", "May-21", "June-21", "July-18")),
+         Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                                              "BerryBlossom", "CherryBlossomxTI")))
+
+flower_eletta <- filter(flower_pilot, Variety == "Eletta")
+
+ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
+  geom_point() +
+  facet_grid(Variety~PlantingDate, scales = "free_x") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 
 flower_induc_pilot <- flower_pilot %>%
-  filter(Induc_perc == 100) %>%
+  filter(Induc_perc >= 50) %>%
   group_by(Experiment, Variety, Block) %>% 
   summarize(induc_date = min(Date)) %>%
   group_by(Experiment, Variety) %>%  
-  summarize(induc_date = min(induc_date), avg_date = mean(induc_date))
+  summarize(induc_date = min(induc_date)) %>% 
+  arrange(induc_date)
+write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
 flower_induc_variety <- flower_data %>%
-  filter(Experiment == "VarietyTrial", Induc_perc >=80) %>%
+  filter(Experiment == "VarietyTrial", Induc_perc >=50) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-"))) %>%
   group_by(Variety, Block) %>% 
   summarize(induc_date = min(Date)) %>%
