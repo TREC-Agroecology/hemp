@@ -57,6 +57,32 @@ ggplot(emergence_pilot, aes(x=Date, y=avg_emergence, color=Variety)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/emergence.png")
 
+
+### Density Data
+density_data <- collect_data("PlantDensity", dates$Experiment[1:2])
+
+density_pilot <- density_data %>%
+  filter(Variety %in% planting_date_varieties$Variety) %>% 
+  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                                              "BerryBlossom", "CherryBlossomxTI")))
+
+ggplot(density_pilot, aes(x=Date, y=Quantity)) +
+  geom_point() +
+  facet_grid(Variety~Experiment, scales = "free_x") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+density_variety <- density_data %>%
+  filter(Experiment == "VarietyTrial") %>% 
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-")))
+
+ggplot(density_variety, aes(x=Date, y=Quantity)) +
+  geom_point() +
+  facet_wrap(~ Variety) +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
 ### Stand Count
 stand_count_data <- collect_data("StandCount")
 
