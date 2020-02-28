@@ -2,7 +2,23 @@ library(tidyverse)
 library(lubridate)
 library(agricolae)
 
-list.files("data/")
+collect_data <- function(data_name, experiment_names = dates$Experiment, plot_info = plots){
+  data_name_tag <- paste0(".*", data_name, ".*") 
+  for (experiment in experiment_names){
+    plot_varieties <- plot_info %>%
+      filter(Experiment == experiment)
+    data_file <- str_subset(list.files("data/"), paste0(experiment, data_name_tag))
+    trial_data <- read_csv(paste0("data/", data_file)) %>%
+      mutate(Date = ymd(paste(Year, Month, Day, sep = "-"))) %>%
+      left_join(plot_varieties)
+    if (exists("data_output")){
+      data_output <- bind_rows(data_output, trial_data)
+    } else {
+      data_output <- trial_data
+    }
+  }
+  return(data_output)
+}
 
 dates <- read_csv("data/Trials_Dates.csv") %>% 
   mutate(Experiment = factor(Experiment, levels = c("PilotPlot1", "VarietyTrial",
@@ -19,36 +35,56 @@ planting_date_varieties <- data.frame(
              "Europe", "Europe", "Europe")
 )
 
-### Emergence Data  -  NOT COMPLETE
-emergence_data <- list()
-for (experiment in dates$Experiment){
-  plot_varieties <- plots %>%
-    filter(Experiment == experiment)
-  emergence_file <- str_subset(list.files("data/"), paste0(experiment, ".*Emergence.*"))
-  emergence_data[[experiment]] <- read_csv(paste0("data/", emergence_file)) %>%
-    mutate(Date = ymd(paste(Year, Month, Day, sep = "-"))) %>%
-    left_join(plot_varieties)
-}
+### Emergence Data
+emergence_data <- collect_data("Emergence")
 
-avg_emergence <- emergence_data[["PilotPlot1"]] %>%
-  group_by(Date, Variety) %>% 
+avg_emergence <- emergence_data %>%
+  group_by(Experiment, Variety, Date) %>% 
   summarize(avg_emergence = mean(Emergence, na.rm=TRUE)) %>% 
   left_join(select(planting_date_varieties, Variety, Rate_zone)) %>%
   mutate(percent_emergence = avg_emergence/Rate_zone*100)
 
+emergence_pilot <- avg_emergence %>% 
+  filter(Variety %in% planting_date_varieties$Variety) %>%
+  ungroup() %>% 
+  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                                              "BerryBlossom", "CherryBlossomxTI")))
+
+ggplot(emergence_pilot, aes(x=Date, y=avg_emergence, color=Variety)) +
+  geom_line() +
+  facet_grid(.~Experiment, scales = "free_x") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/emergence.png")
+
+
+### Density Data
+density_data <- collect_data("PlantDensity", dates$Experiment[1:2])
+
+density_pilot <- density_data %>%
+  filter(Variety %in% planting_date_varieties$Variety) %>% 
+  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                                              "BerryBlossom", "CherryBlossomxTI")))
+
+ggplot(density_pilot, aes(x=Date, y=Quantity)) +
+  geom_point() +
+  facet_grid(Variety~Experiment, scales = "free_x") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+density_variety <- density_data %>%
+  filter(Experiment == "VarietyTrial") %>% 
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-")))
+
+ggplot(density_variety, aes(x=Date, y=Quantity)) +
+  geom_point() +
+  facet_wrap(~ Variety) +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
 ### Stand Count
-for (experiment in dates$Experiment){
-  plot_varieties <- plots %>%
-    filter(Experiment == experiment)
-  stand_count_file <- str_subset(list.files("data/"), paste0(experiment, ".*StandCount.*"))
-  stand_count_trial <- read_csv(paste0("data/", stand_count_file)) %>%
-    left_join(plot_varieties, by = c("Block", "Row", "Column"))
-  if (exists("stand_count_data")){
-    stand_count_data <- bind_rows(stand_count_data, stand_count_trial)
-  } else {
-    stand_count_data <- stand_count_trial
-  }
-}
+stand_count_data <- collect_data("StandCount")
 
 stand_count_pilot <- stand_count_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>% 
@@ -93,34 +129,48 @@ stand_count_summary_variety <- stand_count_data %>%
             sd_stand_count = sd(StandCount, na.rm=TRUE))
 
 ### Flowering
-for (experiment in dates$Experiment){
-  plot_varieties <- plots %>%
-    filter(Experiment == experiment)
-  flower_file <- str_subset(list.files("data/"), paste0(experiment, ".*Flowering.*"))
-  flower_trial <- read_csv(paste0("data/", flower_file)) %>%
-    left_join(plot_varieties, by = c("Block", "Row", "Column"))
-  if (exists("flower_data")){
-    flower_data <- bind_rows(flower_data, flower_trial)
-  } else {
-    flower_data <- flower_trial
-  }
-}
+flower_data <- collect_data("Flowering")
 
 flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
-  mutate(Date = ymd(paste(Year, Month, Day, sep="-"))) %>% 
-  arrange(desc(FemaleOpen_perc),  desc(MaleOpen_perc), Date, Variety)
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
+         PlantingDate = factor(Experiment, 
+                               levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
+                               labels = c("May-1", "May-21", "June-21", "July-18")),
+         Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                                              "BerryBlossom", "CherryBlossomxTI")))
+
+ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
+  geom_point() +
+  facet_grid(Variety~PlantingDate, scales = "free_x") +
+  labs(x = "Date", y = "Flower Induction [%]") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/flower_pilot.png")
 
 flower_induc_pilot <- flower_pilot %>%
-  filter(Induc_perc == 100) %>%
+  filter(Induc_perc >= 50) %>%
   group_by(Experiment, Variety, Block) %>% 
   summarize(induc_date = min(Date)) %>%
   group_by(Experiment, Variety) %>%  
-  summarize(induc_date = min(induc_date), avg_date = mean(induc_date))
+  summarize(induc_date = min(induc_date)) %>% 
+  arrange(induc_date)
+write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
-flower_induc_variety <- flower_data %>%
-  filter(Experiment == "VarietyTrial", Induc_perc >=80) %>%
-  mutate(Date = ymd(paste(Year, Month, Day, sep="-"))) %>%
+flower_variety <- flower_data %>%
+  filter(Experiment == "VarietyTrial") %>% 
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-")))
+
+ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
+  geom_point() +
+  facet_wrap(~ Variety) +
+  labs(x = "Date", y = "Flower Induction [%]") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/flower_variety.png")
+
+flower_induc_variety <- flower_variety %>% 
+  filter(Induc_perc >=50) %>%
   group_by(Variety, Block) %>% 
   summarize(induc_date = min(Date)) %>%
   group_by(Variety) %>%  
@@ -139,18 +189,7 @@ flower_male_pilot <- flower_pilot %>%
   summarize(male_date = min(Date)) 
 
 ### Grain Harvest
-for (experiment in dates$Experiment[1:2]){
-  plot_varieties <- plots %>%
-    filter(Experiment == experiment)
-  grain_file <- str_subset(list.files("data/"), paste0(experiment, ".*GrainHarvest.*"))
-  grain_trial <- read_csv(paste0("data/", grain_file)) %>%
-    left_join(plot_varieties, by = c("Block", "Row", "Column"))
-  if (exists("grain_data")){
-    grain_data <- bind_rows(grain_data, grain_trial)
-  } else {
-    grain_data <- grain_trial
-  }
-}
+grain_data <- collect_data("GrainHarvest", dates$Experiment[1:2])
 
 grain_dry_down <- grain_data %>%
   filter(!is.na(GrainFreshWeight_g), !is.na(GrainDryWeight_g)) %>% 
@@ -174,7 +213,6 @@ grain_summary <- grain_data %>%
                                levels = c("PilotPlot1", "VarietyTrial"),
                                labels = c("May-1", "May-21")))
         
-
 ggplot(grain_summary, aes(x=PlantingDate, y=avg_grain_dry)) +
   geom_bar(stat = "identity") +
   labs(x = "Planting Date", y = "Grain Dry Wgt [lbs/ac + SD]") +
@@ -185,18 +223,7 @@ ggplot(grain_summary, aes(x=PlantingDate, y=avg_grain_dry)) +
 ggsave("output/grain_summary.png")
 
 ### Fiber Harvest
-for (experiment in dates$Experiment[1:2]){
-  plot_varieties <- plots %>%
-    filter(Experiment == experiment)
-  fiber_file <- str_subset(list.files("data/"), paste0(experiment, ".*FiberHarvest_GM.*"))
-  fiber_trial <- read_csv(paste0("data/", fiber_file)) %>%
-    left_join(plot_varieties, by = c("Block", "Row", "Column"))
-  if (exists("fiber_data")){
-    fiber_data <- bind_rows(fiber_data, fiber_trial)
-  } else {
-    fiber_data <- fiber_trial
-  }
-}
+fiber_data <- collect_data("FiberHarvest_GM", dates$Experiment[1:2])
 
 fiber_dry_down <- fiber_data %>%
   filter(!is.na(SampleDryWeight_g)) %>% 
@@ -217,7 +244,6 @@ fiber_summary <- fiber_data %>%
   mutate(PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial"),
                                labels = c("May-1", "May-21")))
-
 
 ggplot(fiber_summary, aes(x=PlantingDate, y=avg_fiber_dry)) +
   geom_bar(stat = "identity") +
