@@ -30,7 +30,7 @@ planting_date_varieties <- data.frame(
   Variety = c("Yuma-2", "Puma-3", "Bama", "BerryBlossom", "CherryBlossomxTI",
               "Eletta", "Tygra", "CarmagnolaSelezionata"),
   Rate_plot = c(900, 1500, 900, 60, 60, 1500, 900, 900),
-  Rate_zone = c(167, 278, 167, 60, 60, 278, 167, 167),
+  Rate_zone = c(161, 268, 161, 60, 60, 268, 161, 161),
   Region = c("China", "China", "China", "USA", "USA",
              "Europe", "Europe", "Europe")
 )
