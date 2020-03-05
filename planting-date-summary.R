@@ -35,6 +35,8 @@ planting_date_varieties <- data.frame(
              "Europe", "Europe", "Europe")
 )
 
+
+
 ### Emergence Data
 emergence_data <- collect_data("Emergence")
 
@@ -107,7 +109,7 @@ stand_count_summary_pilot <- stand_count_pilot %>%
                                               "BerryBlossom", "CherryBlossomxTI")),
          PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
-                               labels = c("May-1", "May-21", "June-21", "July-18"))) %>%
+                               labels = c("May-1", "May-22", "June-21", "July-18"))) %>%
   group_by(PlantingDate, Variety) %>% 
   summarize(         
     avg_stand_percent= mean(stand_percent, na.rm=TRUE),
@@ -136,7 +138,7 @@ flower_pilot <- flower_data %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
          PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
-                               labels = c("May-1", "May-21", "June-21", "July-18")),
+                               labels = c("May-1", "May-22", "June-21", "July-18")),
          Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
                                               "BerryBlossom", "CherryBlossomxTI")))
 
@@ -211,7 +213,7 @@ grain_summary <- grain_data %>%
             sd_grain_dry = sd(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down) %>% 
   mutate(PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial"),
-                               labels = c("May-1", "May-21")))
+                               labels = c("May-1", "May-22")))
         
 ggplot(grain_summary, aes(x=PlantingDate, y=avg_grain_dry)) +
   geom_bar(stat = "identity") +
@@ -243,7 +245,7 @@ fiber_summary <- fiber_data %>%
             sd_fiber_dry = sd_fiber_fresh*fiber_dry_down$dry_down) %>% 
   mutate(PlantingDate = factor(Experiment, 
                                levels = c("PilotPlot1", "VarietyTrial"),
-                               labels = c("May-1", "May-21")))
+                               labels = c("May-1", "May-22")))
 
 ggplot(fiber_summary, aes(x=PlantingDate, y=avg_fiber_dry)) +
   geom_bar(stat = "identity") +
