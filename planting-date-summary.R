@@ -155,19 +155,6 @@ flower_induc_pilot <- flower_induc_pilot_blocks %>%
   arrange(induc_date)
 write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
-flower_induc_variety_blocks <- flower_variety %>% 
-  filter(Induc_perc >=50) %>%
-  mutate(day_interval = Date - ymd("2019-May-22")) %>% 
-  group_by(Class, Variety, Block, Row) %>% 
-  summarize(induc_interval = min(day_interval)) 
-
-flower_induc_variety <- flower_induc_variety_blocks %>%
-  group_by(Class, Variety) %>%  
-  summarize(avg_induc_interval = mean(induc_interval),
-            induc_date = ymd("2019-May-22") + days(round(avg_induc_interval, 0)),
-            sd_induc_interval = sd(as.numeric(induc_interval))) %>% 
-  arrange(induc_date)
-
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
   geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date), linetype="dashed") +
