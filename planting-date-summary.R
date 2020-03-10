@@ -35,6 +35,14 @@ planting_date_varieties <- data.frame(
              "Europe", "Europe", "Europe")
 )
 
+variety_levels <- c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
+                    "BerryBlossom", "CherryBlossomxTI")
+variety_labels <- c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "Carmag. Sel.",
+                    "BerryBlossom", "CherryBlos. xTI")
+
+experiment_levels <- c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8")
+experiment_labels <- c("May-01", "May-22", "June-21", "July-18")
+
 ### Emergence Data
 emergence_data <- collect_data("Emergence")
 
@@ -47,8 +55,7 @@ avg_emergence <- emergence_data %>%
 emergence_pilot <- avg_emergence %>% 
   filter(Variety %in% planting_date_varieties$Variety) %>%
   ungroup() %>% 
-  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
-                                              "BerryBlossom", "CherryBlossomxTI")))
+  mutate(Variety = factor(Variety, variety_levels, variety_labels))
 
 ggplot(emergence_pilot, aes(x=Date, y=avg_emergence, color=Variety)) +
   geom_line() +
@@ -63,8 +70,7 @@ density_data <- collect_data("PlantDensity", dates$Experiment[1:2])
 
 density_pilot <- density_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>% 
-  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
-                                              "BerryBlossom", "CherryBlossomxTI")))
+  mutate(Variety = factor(Variety, variety_levels, variety_labels))
 
 ggplot(density_pilot, aes(x=Date, y=Quantity)) +
   geom_point() +
@@ -103,11 +109,8 @@ stand_count_summary_pilot <- stand_count_pilot %>%
   filter(Day %in% c(NA, 7, 17)) %>% 
   left_join(planting_date_varieties, by = "Variety") %>%
   ungroup() %>% 
-  mutate(Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
-                                              "BerryBlossom", "CherryBlossomxTI")),
-         PlantingDate = factor(Experiment, 
-                               levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
-                               labels = c("May-1", "May-21", "June-21", "July-18"))) %>%
+  mutate(Variety = factor(Variety, variety_levels, variety_labels),
+         PlantingDate = factor(Experiment, experiment_levels, experiment_labels)) %>%
   group_by(PlantingDate, Variety) %>% 
   summarize(         
     avg_stand_percent= mean(stand_percent, na.rm=TRUE),
@@ -134,11 +137,8 @@ flower_data <- collect_data("Flowering")
 flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
-         PlantingDate = factor(Experiment, 
-                               levels = c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8"),
-                               labels = c("May-1", "May-21", "June-21", "July-18")),
-         Variety = factor(Variety, levels = c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "CarmagnolaSelezionata",
-                                              "BerryBlossom", "CherryBlossomxTI")))
+         PlantingDate = factor(Experiment, experiment_levels, experiment_labels),
+         Variety = factor(Variety, variety_levels, variety_labels))
 
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
@@ -208,10 +208,10 @@ grain_summary <- grain_data %>%
   summarize(avg_grain_harvest = mean(grain_harvest_lbsac, na.rm=TRUE),
             sd_grain_harvest = sd(grain_harvest_lbsac, na.rm=TRUE),
             avg_grain_dry = mean(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down,
-            sd_grain_dry = sd(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down) %>% 
-  mutate(PlantingDate = factor(Experiment, 
-                               levels = c("PilotPlot1", "VarietyTrial"),
-                               labels = c("May-1", "May-21")))
+            sd_grain_dry = sd(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down) %>%
+  ungroup() %>% 
+  mutate(PlantingDate = factor(Experiment, experiment_levels, experiment_labels),
+         Variety = str_replace_all(Variety, "CarmagnolaSelezionata", "Carmag. Sel."))
         
 ggplot(grain_summary, aes(x=PlantingDate, y=avg_grain_dry)) +
   geom_bar(stat = "identity") +
@@ -240,10 +240,8 @@ fiber_summary <- fiber_data %>%
   summarize(avg_fiber_fresh = mean(fiber_fresh_lbsac, na.rm=TRUE),
             sd_fiber_fresh = sd(fiber_fresh_lbsac, na.rm=TRUE),
             avg_fiber_dry = avg_fiber_fresh*fiber_dry_down$dry_down,
-            sd_fiber_dry = sd_fiber_fresh*fiber_dry_down$dry_down) %>% 
-  mutate(PlantingDate = factor(Experiment, 
-                               levels = c("PilotPlot1", "VarietyTrial"),
-                               labels = c("May-1", "May-21")))
+            sd_fiber_dry = sd_fiber_fresh*fiber_dry_down$dry_down) %>%
+  mutate(PlantingDate = factor(Experiment, experiment_levels, experiment_labels))
 
 ggplot(fiber_summary, aes(x=PlantingDate, y=avg_fiber_dry)) +
   geom_bar(stat = "identity") +
