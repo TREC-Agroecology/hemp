@@ -42,6 +42,7 @@ variety_labels <- c("Yuma-2", "Puma-3", "Bama", "Eletta", "Tygra", "Carmag. Sel.
 
 experiment_levels <- c("PilotPlot1", "VarietyTrial", "PilotPlot2", "PilotPlotPlus8")
 experiment_labels <- c("May-01", "May-22", "June-21", "July-18")
+experiment_labels_full <- c("May-01-2019", "May-22-2019", "June-21-2019", "July-18-2019")
 
 ### Emergence Data
 emergence_data <- collect_data("Emergence")
@@ -137,25 +138,44 @@ flower_data <- collect_data("Flowering")
 flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
-         PlantingDate = factor(Experiment, experiment_levels, experiment_labels),
+         PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
          Variety = factor(Variety, variety_levels, variety_labels))
+
+flower_induc_pilot_blocks <- flower_pilot %>%
+  filter(Induc_perc >= 50) %>%
+  mutate(day_interval = Date - mdy(PlantingDate)) %>% 
+  group_by(PlantingDate, Variety, Block) %>% 
+  summarize(induc_interval = min(day_interval))
+
+flower_induc_pilot <- flower_induc_pilot_blocks %>% 
+  group_by(PlantingDate, Variety) %>%  
+  summarize(avg_induc_interval = mean(induc_interval),
+            induc_date = min(mdy(PlantingDate)) + days(round(avg_induc_interval, 0)),
+            sd_induc_interval = sd(as.numeric(induc_interval))) %>% 
+  arrange(induc_date)
+write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
+
+flower_induc_variety_blocks <- flower_variety %>% 
+  filter(Induc_perc >=50) %>%
+  mutate(day_interval = Date - ymd("2019-May-22")) %>% 
+  group_by(Class, Variety, Block, Row) %>% 
+  summarize(induc_interval = min(day_interval)) 
+
+flower_induc_variety <- flower_induc_variety_blocks %>%
+  group_by(Class, Variety) %>%  
+  summarize(avg_induc_interval = mean(induc_interval),
+            induc_date = ymd("2019-May-22") + days(round(avg_induc_interval, 0)),
+            sd_induc_interval = sd(as.numeric(induc_interval))) %>% 
+  arrange(induc_date)
 
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
-  facet_grid(Variety~PlantingDate, scales = "free_x") +
+  geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date), linetype="dashed") +
+  facet_grid(Variety~PlantingDate) +  # scales = "free_x"
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_pilot.png")
-
-flower_induc_pilot <- flower_pilot %>%
-  filter(Induc_perc >= 50) %>%
-  group_by(Experiment, Variety, Block) %>% 
-  summarize(induc_date = min(Date)) %>%
-  group_by(Experiment, Variety) %>%  
-  summarize(induc_date = min(induc_date)) %>% 
-  arrange(induc_date)
-write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
 flower_variety <- flower_data %>%
   filter(Experiment == "VarietyTrial") %>% 
@@ -163,20 +183,52 @@ flower_variety <- flower_data %>%
 
 ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   geom_point() +
-  facet_wrap(~ Variety) +
+  facet_wrap(~Variety) +
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_variety.png")
 
-flower_induc_variety <- flower_variety %>% 
+flower_induc_variety_blocks <- flower_variety %>% 
   filter(Induc_perc >=50) %>%
-  group_by(Variety, Block) %>% 
-  summarize(induc_date = min(Date)) %>%
-  group_by(Variety) %>%  
-  summarize(induc_date = min(induc_date)) %>% 
+  mutate(day_interval = Date - ymd("2019-May-22")) %>% 
+  group_by(Class, Variety, Block, Row) %>% 
+  summarize(induc_interval = min(day_interval)) 
+
+flower_induc_variety <- flower_induc_variety_blocks %>%
+  group_by(Class, Variety) %>%  
+  summarize(avg_induc_interval = mean(induc_interval),
+            induc_date = ymd("2019-May-22") + days(round(avg_induc_interval, 0)),
+            sd_induc_interval = sd(as.numeric(induc_interval))) %>% 
   arrange(induc_date)
 write_csv(flower_induc_variety, "output/flower_induc_variety.csv")
+
+ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
+  geom_point() +
+  geom_vline(data=flower_induc_variety, aes(xintercept = induc_date), 
+             linetype="dashed", color="darkgrey") +
+  facet_wrap(~Class+Variety, dir="v") +
+  labs(x = "Date", y = "Flower Induction [%]") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/flower_variety_class.png")
+
+flower_induc_class <- flower_induc_variety %>%
+  group_by(Class) %>%  
+  summarize(Avg_induc_interval = mean(avg_induc_interval),
+            Induc_date = ymd("2019-May-22") + days(round(Avg_induc_interval, 0)),
+            Sd_induc_interval = sd(as.numeric(avg_induc_interval))) %>% 
+  arrange(Induc_date)
+write_csv(flower_induc_variety, "output/flower_induc_class.csv")
+
+ggplot(flower_variety, aes(x=Date, y=Induc_perc, shape = Class)) +
+  geom_point() +
+  geom_vline(data=flower_induc_class, aes(xintercept = Induc_date), linetype="dotted") +
+  labs(x = "Date", y = "Flower Induction [%]") +
+  scale_shape_manual(values = c(0,1,2,5,6,7,9)) +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/flower_class.png")
 
 flower_female_pilot <- flower_pilot %>%
   filter(FemaleOpen_perc == 100) %>%
