@@ -141,14 +141,32 @@ flower_pilot <- flower_data %>%
          PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
          Variety = factor(Variety, variety_levels, variety_labels))
 
-flower_induc_pilot <- flower_pilot %>%
+flower_induc_pilot_blocks <- flower_pilot %>%
   filter(Induc_perc >= 50) %>%
+  mutate(day_interval = Date - mdy(PlantingDate)) %>% 
   group_by(PlantingDate, Variety, Block) %>% 
-  summarize(induc_date = min(Date)) %>%
+  summarize(induc_interval = min(day_interval))
+
+flower_induc_pilot <- flower_induc_pilot_blocks %>% 
   group_by(PlantingDate, Variety) %>%  
-  summarize(induc_date = min(induc_date)) %>% 
+  summarize(avg_induc_interval = mean(induc_interval),
+            induc_date = min(mdy(PlantingDate)) + days(round(avg_induc_interval, 0)),
+            sd_induc_interval = sd(as.numeric(induc_interval))) %>% 
   arrange(induc_date)
 write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
+
+flower_induc_variety_blocks <- flower_variety %>% 
+  filter(Induc_perc >=50) %>%
+  mutate(day_interval = Date - ymd("2019-May-22")) %>% 
+  group_by(Class, Variety, Block, Row) %>% 
+  summarize(induc_interval = min(day_interval)) 
+
+flower_induc_variety <- flower_induc_variety_blocks %>%
+  group_by(Class, Variety) %>%  
+  summarize(avg_induc_interval = mean(induc_interval),
+            induc_date = ymd("2019-May-22") + days(round(avg_induc_interval, 0)),
+            sd_induc_interval = sd(as.numeric(induc_interval))) %>% 
+  arrange(induc_date)
 
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
@@ -187,8 +205,9 @@ write_csv(flower_induc_variety, "output/flower_induc_variety.csv")
 
 ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   geom_point() +
-  geom_vline(data=flower_induc_variety, aes(xintercept = induc_date), linetype="dashed") +
-  facet_wrap(~Class+Variety) +
+  geom_vline(data=flower_induc_variety, aes(xintercept = induc_date), 
+             linetype="dashed", color="darkgrey") +
+  facet_wrap(~Class+Variety, dir="v") +
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
