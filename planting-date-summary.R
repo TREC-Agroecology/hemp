@@ -5,7 +5,7 @@ library(lubridate)
 library(agricolae)
 
 collect_data <- function(data_name, experiment_names = dates$Experiment, plot_info = plots){
-  data_name_tag <- paste0(".*", data_name, ".*") 
+  data_name_tag <- paste0(".*", data_name, ".csv") 
   for (experiment in experiment_names){
     plot_varieties <- plot_info %>%
       filter(Experiment == experiment)
@@ -261,6 +261,29 @@ flower_male_pilot <- flower_pilot %>%
   group_by(Experiment, Variety) %>% 
   summarize(male_date = min(Date)) 
 
+### Height
+height_data <- collect_data("PlantHeight-SexRatio")
+canopy_data <- collect_data("PlantHeight", "VarietyTrial")
+
+height_pilot <- height_data %>%
+  filter(Variety %in% planting_date_varieties$Variety) %>%
+  mutate(PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
+         Variety = factor(Variety, variety_levels, variety_labels)) %>% 
+  group_by(PlantingDate, Variety, Date) %>% 
+  summarize(mean_height = mean(Height_cm, na.rm=TRUE))
+
+max_height_pilot <- height_pilot %>% 
+  group_by(PlantingDate, Variety) %>% 
+  summarize(max_height = round(max(mean_height, na.rm=TRUE), 3))
+
+height_variety <- canopy_data %>%
+  group_by(Variety, Date) %>% 
+  summarize(mean_height = mean(Height_cm, na.rm=TRUE))
+
+max_height_variety <- height_variety %>% 
+  group_by(Variety) %>% 
+  summarize(max_height = round(max(mean_height, na.rm=TRUE), 3))
+
 ### Grain Harvest
 grain_data <- collect_data("GrainHarvest", dates$Experiment[1:2])
 
@@ -324,3 +347,19 @@ ggplot(fiber_summary, aes(x=PlantingDate, y=avg_fiber_dry)) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/fiber_summary.png")
+
+### Summary Table
+
+plots_summary <- plots %>%
+  filter(Variety %in% planting_date_varieties$Variety) %>% 
+  mutate(Variety = factor(Variety, variety_levels, variety_labels)) %>% 
+  distinct(Variety, Latitude)
+    
+pilot_summary <- left_join(flower_induc_pilot_50, max_height_pilot) %>% 
+  select(PlantingDate, Variety, FloweringTime = induc_date_50, MaxHeight = max_height) %>% 
+  left_join(plots_summary)
+write_csv(pilot_summary, "output/flowering_height_summary_pilot.csv")
+
+variety_summary <- left_join(flower_induc_variety_50, max_height_variety) %>% 
+  select(Variety, Latitude, FloweringTime = induc_date_50, MaxHeight = max_height)
+write_csv(variety_summary, "output/flowering_height_summary_variety.csv")
