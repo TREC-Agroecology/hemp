@@ -142,7 +142,8 @@ flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
          PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
-         Variety = factor(Variety, variety_levels, variety_labels))
+         Variety = factor(Variety, variety_levels, variety_labels),
+         days_after = Date - mdy(PlantingDate))
 
 flower_induc_pilot_blocks_10 <- flower_pilot %>%
   filter(Induc_perc >= 10) %>%
@@ -175,12 +176,20 @@ write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
-  geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date), linetype="dashed") +
+  geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date_50), linetype="dashed") +
   facet_grid(Variety~PlantingDate) +  # scales = "free_x"
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_pilot.png")
+
+bb_sub <- flower_pilot %>% 
+  filter(Variety == "BerryBlossom", PlantingDate == "May-01-2019",
+         !is.na(Induc_perc))
+sigmoid_fit <- nls(Induc_perc ~ b/(1 + exp(-c * (as.numeric(days_after) - d))),
+                   data = bb_sub,
+                   start = list(b=101, c = 1, d = 50))
+sigmoid_lm <- lm(Induc_perc ~ 1/(1 + exp(as.numeric(days_after))), data=bb_sub)
 
 #### Variety flowering
 flower_variety <- flower_data %>%
