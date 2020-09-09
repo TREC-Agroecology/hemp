@@ -184,12 +184,22 @@ ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
 ggsave("output/flower_pilot.png")
 
 bb_sub <- flower_pilot %>% 
-  filter(Variety == "BerryBlossom", PlantingDate == "May-01-2019",
+  filter(Variety == "Yuma-2", PlantingDate == "May-22-2019",
          !is.na(Induc_perc))
 sigmoid_fit <- nls(Induc_perc ~ b/(1 + exp(-c * (as.numeric(days_after) - d))),
                    data = bb_sub,
-                   start = list(b=101, c = 1, d = 50))
-sigmoid_lm <- lm(Induc_perc ~ 1/(1 + exp(as.numeric(days_after))), data=bb_sub)
+                   start = list(b = 101, c = 1, d = 50))
+exponent_fit <- nls(Induc_perc ~ a * (exp(k * as.numeric(days_after))), 
+                    data = bb_sub,
+                    start = list(a = 0.1, k = 0.1))
+lm(Induc_perc ~ exp(as.numeric(days_after)), data = bb_sub)
+
+
+for (var in flower_pilot$Variety){
+  for (day in flower_pilot$PlantingDate){
+    sigmoid_test <- "Hello World"
+  }
+}
 
 #### Variety flowering
 flower_variety <- flower_data %>%
