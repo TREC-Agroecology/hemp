@@ -3,19 +3,7 @@
 library(brms)
 library(tidyverse)
 library(lubridate)
-
-b <- c(2, 0.75)
-x <- rnorm(100)
-y <- rnorm(100, mean = b[1] * exp(b[2] * x))
-dat1 <- data.frame(x, y)
-
-prior1 <- prior(normal(1, 2), nlpar = "b1") +
-  prior(normal(0, 2), nlpar = "b2")
-fit1 <- brm(bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
-            data = dat1, prior = prior1)
-summary(fit1)
-plot(fit1)
-plot(conditional_effects(fit1), points = TRUE)
+library(segmented)
             
 collect_data <- function(data_name, experiment_names = dates$Experiment, plot_info = plots){
   data_name_tag <- paste0(".*", data_name, ".csv") 
@@ -98,7 +86,7 @@ flower_induc_pilot_50 <- flower_induc_pilot_blocks_50 %>%
   arrange(induc_date_50)
 
 flower_induc_pilot <- left_join(flower_induc_pilot_10, flower_induc_pilot_50)
-write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
+#write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
@@ -107,7 +95,7 @@ ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
-ggsave("output/flower_pilot.png")
+#ggsave("output/flower_pilot.png")
 
 
 #### Variety
@@ -122,7 +110,7 @@ ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
-ggsave("output/flower_variety.png")
+#ggsave("output/flower_variety.png")
 
 flower_induc_variety_blocks_10 <- flower_variety %>% 
   filter(Induc_perc >=10) %>%
@@ -151,7 +139,7 @@ flower_induc_variety_50 <- flower_induc_variety_blocks_50 %>%
   arrange(induc_date_50)
 
 flower_induc_variety <- left_join(flower_induc_variety_10, flower_induc_variety_50)
-write_csv(flower_induc_variety, "output/flower_induc_variety.csv")
+#write_csv(flower_induc_variety, "output/flower_induc_variety.csv")
 
 ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   geom_point() +
@@ -161,7 +149,7 @@ ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
-ggsave("output/flower_variety_class.png")
+#ggsave("output/flower_variety_class.png")
 
 flower_induc_class <- flower_induc_variety %>%
   group_by(Latitude) %>%  
@@ -169,7 +157,7 @@ flower_induc_class <- flower_induc_variety %>%
             Induc_date = ymd("2019-May-22") + days(round(Avg_induc_interval, 0)),
             Sd_induc_interval = sd(as.numeric(avg_induc_interval_50))) %>% 
   arrange(Induc_date)
-write_csv(flower_induc_variety, "output/flower_induc_class.csv")
+#write_csv(flower_induc_variety, "output/flower_induc_class.csv")
 
 ggplot(flower_variety, aes(x=Date, y=Induc_perc, shape = as.ordered(Latitude))) +
   geom_point() +
@@ -178,7 +166,7 @@ ggplot(flower_variety, aes(x=Date, y=Induc_perc, shape = as.ordered(Latitude))) 
   scale_shape_manual(values = c(9,7,1,5,0,2)) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
-ggsave("output/flower_class.png")
+#ggsave("output/flower_class.png")
 
 flower_female_pilot <- flower_pilot %>%
   filter(FemaleOpen_perc == 100) %>%
@@ -192,24 +180,87 @@ flower_male_pilot <- flower_pilot %>%
 
 ### Models
 
+segment_1 <- flower_variety %>% 
+  split(.$Variety) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  map_dbl("r.squared")
+
+segment_2 <- flower_variety %>% 
+  filter(Latitude < 50) %>% 
+  split(.$Variety) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
+  map(summary) %>% 
+  map_dbl("r.squared")
+
+seg_results <- left_join(enframe(segment_1), enframe(segment_2), by = c("name")) %>% 
+  mutate(r_diff = value.x-value.y)
+
+segment_1_psi <- flower_variety %>% 
+  split(.$Variety) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  transpose() %>% 
+  pluck("psi")
+
+segment_1_coeff <- flower_variety %>% 
+  split(.$Variety) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  transpose() %>% 
+  pluck("coefficients")
+
+segment_2_psi <- flower_variety %>% 
+  filter(Latitude < 50) %>% 
+  split(.$Variety) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
+  map(summary) %>% 
+  transpose() %>% 
+  pluck("psi")
+
+
+
+### OTHER
+
 bb_sub <- flower_variety %>% 
-  filter(Variety == "Yuma-2", # PlantingDate == "May-22-2019",
+  filter(Variety == "HanFNQ", # PlantingDate == "May-22-2019",
          !is.na(Induc_perc))
 
-sigmoid_fit <- nls(Induc_perc ~ b/(1 + exp(-c * (as.numeric(days_after) - d))),
+### nls
+sigmoid_fit <- nls(Induc_perc ~ b/(1 + exp(-c * (days_after - d))),
                    data = bb_sub,
                    start = list(b = 101, c = 1, d = 50))
-exponent_fit <- nls(Induc_perc ~ a * (exp(k * as.numeric(days_after))), 
+exponent_fit <- nls(Induc_perc ~ a * (exp(k * days_after)), 
                     data = bb_sub,
                     start = list(a = 0.1, k = 0.1))
-lm(Induc_perc ~ exp(as.numeric(days_after)), data = bb_sub)
+michaelis_fit <- nls(Induc_perc ~ (a * days_after) / (b + days_after), 
+                     data = bb_sub,
+                     start = list(a = 10, b = 0.1))
 
+
+### brms
+
+#### Tutorial
+b <- c(2, 0.75)
+x <- rnorm(100)
+y <- rnorm(100, mean = b[1] * exp(b[2] * x))
+dat1 <- data.frame(x, y)
+
+prior1 <- prior(normal(1, 2), nlpar = "b1") +
+  prior(normal(0, 2), nlpar = "b2")
+fit1 <- brm(bf(y ~ b1 * exp(b2 * x), b1 + b2 ~ 1, nl = TRUE),
+            data = dat1, prior = prior1)
+summary(fit1)
+plot(fit1)
+plot(conditional_effects(fit1), points = TRUE)
+
+#### Data
 prior_sig <- prior(normal(101, 2), nlpar = "b") +
   prior(normal(1, 1), nlpar = "c") +
   prior(normal(50, 2), nlpar = "d")
 fit_sig <- brm(bf(Induc_perc ~ b/(1 + exp(-c * (days_after - d))),
                   b ~ 1, c ~ 1, d ~ 1, nl = TRUE),
-            data = bb_sub, prior = prior_sig)
+               data = bb_sub, prior = prior_sig)
 plot(conditional_effects(fit_sig), points = TRUE)
 
 prior_exp <- prior(normal(0, 0.1), nlpar = "a") +
@@ -219,15 +270,16 @@ fit_exp <- brm(bf(Induc_perc ~ a * exp(k * (days_after)),
                data = bb_sub, prior = prior_exp)
 plot(conditional_effects(fit_exp), points = TRUE)
 
-flower_variety %>%
-  split(.$Variety) %>%
-  map(~ lm(Induc_perc ~ exp(as.numeric(days_after))),
-            data = .) %>%
-  map(summary) %>%
-  map_dbl("r.squared")
+prior_mm <- prior(normal(101, 0.1), nlpar = "a") +
+  prior(normal(1, 0.1), nlpar = "b")
+fit_mm <- brm(bf(Induc_perc ~ (a * days_after) / (b + days_after),
+                 a ~ 1, b ~ 1, nl = TRUE),
+              data = bb_sub, prior = prior_mm)
+plot(conditional_effects(fit_mm), points = TRUE)
 
-for (var in flower_pilot$Variety){
-  for (day in flower_pilot$PlantingDate){
-    sigmoid_test <- "Hello World"
-  }
-}
+prior_asym <- prior(normal(101, 1), nlpar = "a") +
+  prior(normal(10, 1), nlpar = "b") + prior(normal(0.1, 0.1), nlpar = "c")
+fit_asym <- brm(bf(Induc_perc ~ a - (a - b) * exp(-c * days_after),
+                   a ~ 1, b ~ 1, c ~ 1, nl = TRUE),
+                data = bb_sub, prior = prior_asym)
+plot(conditional_effects(fit_asym), points = TRUE)
