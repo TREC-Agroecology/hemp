@@ -180,7 +180,8 @@ flower_male_pilot <- flower_pilot %>%
 
 ### Models
 
-segment_1 <- flower_variety %>% 
+segment_1 <- flower_variety %>%
+  filter(Latitude == 50) %>% 
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
@@ -193,22 +194,15 @@ segment_2 <- flower_variety %>%
   map(summary) %>% 
   map_dbl("r.squared")
 
-seg_results <- left_join(enframe(segment_1), enframe(segment_2), by = c("name")) %>% 
-  mutate(r_diff = value.x-value.y)
+seg_results <- bind_rows(enframe(segment_1), enframe(segment_2))
 
-segment_1_psi <- flower_variety %>% 
+segment_1_psi <- flower_variety %>%
+  filter(Latitude == 50) %>% 
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
   transpose() %>% 
   pluck("psi")
-
-segment_1_coeff <- flower_variety %>% 
-  split(.$Variety) %>% 
-  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
-  map(summary) %>% 
-  transpose() %>% 
-  pluck("coefficients")
 
 segment_2_psi <- flower_variety %>% 
   filter(Latitude < 50) %>% 
@@ -218,7 +212,25 @@ segment_2_psi <- flower_variety %>%
   transpose() %>% 
   pluck("psi")
 
+segment_1_m <- flower_variety %>%
+  filter(Latitude == 50) %>% 
+  split(.$Variety) %>% 
+  map(~slope(segmented(lm(Induc_perc ~ days_after, data = .))))
 
+segment_1_b <- flower_variety %>%
+  filter(Latitude == 50) %>% 
+  split(.$Variety) %>% 
+  map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .))))
+
+segment_2_m <- flower_variety %>%
+  filter(Latitude < 50) %>% 
+  split(.$Variety) %>% 
+  map(~slope(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
+
+segment_2_b <- flower_variety %>%
+  filter(Latitude < 50) %>% 
+  split(.$Variety) %>% 
+  map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
 
 ### OTHER
 
