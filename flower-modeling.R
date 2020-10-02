@@ -99,6 +99,12 @@ ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
 
 
 #### Variety
+latitude_variety <- plots %>% 
+  filter(Experiment == "VarietyTrial") %>%
+  select(latitude = Latitude, variety = Variety) %>% 
+  distinct(latitude, variety) %>% 
+  arrange(latitude)
+
 flower_variety <- flower_data %>%
   filter(Experiment == "VarietyTrial") %>% 
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
@@ -180,15 +186,23 @@ flower_male_pilot <- flower_pilot %>%
 
 ### Models
 
-segment_1 <- flower_variety %>%
-  filter(Latitude == 50) %>% 
+lat_50 <- flower_variety %>% 
+  filter(Latitude == 50)
+
+lat_50_varieties <- distinct(lat_50, Variety)
+
+not_50 <- flower_variety %>% 
+  filter(Latitude < 50)
+
+not_50_varieties <- distinct(not_50, Variety)
+
+segment_1_r <- lat_50 %>%  
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
   map_dbl("r.squared")
 
-segment_2 <- flower_variety %>% 
-  filter(Latitude < 50) %>% 
+segment_2_r <- not_50 %>% 
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
   map(summary) %>% 
@@ -196,46 +210,89 @@ segment_2 <- flower_variety %>%
 
 seg_results <- bind_rows(enframe(segment_1), enframe(segment_2))
 
-segment_1_psi <- flower_variety %>%
-  filter(Latitude == 50) %>% 
+segment_1_psi <- lat_50  %>%
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
   transpose() %>% 
   pluck("psi")
 
-segment_2_psi <- flower_variety %>% 
-  filter(Latitude < 50) %>% 
+segment_2_psi <- not_50 %>% 
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
   map(summary) %>% 
   transpose() %>% 
   pluck("psi")
 
-segment_1_m <- flower_variety %>%
-  filter(Latitude == 50) %>% 
+segment_1_m <- lat_50 %>%
   split(.$Variety) %>% 
   map(~slope(segmented(lm(Induc_perc ~ days_after, data = .))))
 
-segment_1_b <- flower_variety %>%
-  filter(Latitude == 50) %>% 
+segment_1_b <- lat_50 %>%
   split(.$Variety) %>% 
   map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .))))
 
-segment_2_m <- flower_variety %>%
-  filter(Latitude < 50) %>% 
+segment_2_m <- not_50 %>%
   split(.$Variety) %>% 
   map(~slope(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
 
-segment_2_b <- flower_variety %>%
-  filter(Latitude < 50) %>% 
+segment_2_b <- not_50 %>%
   split(.$Variety) %>% 
   map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
+
+seg_output <- data.frame(variety = c(), r_squared = c(),
+                           breakpoint = c(), breakpoint_se = c(), 
+                           slope = c(), slope_se =  c(), intercept = c())
+
+lat_50_output <- data.frame()
+for ( variety in lat_50_varieties$Variety ) {
+  r_squared <- round(segment_1_r[[variety]], 3)
+  breakpoint_1 <- round(segment_1_psi[[variety]][[2]],3)
+  breakpoint_1_se <- round(segment_1_psi[[variety]][[3]],3)
+  slope_1 <- round(segment_1_m[[variety]][[1]][1, 1],3)
+  slope_1_se <- round(segment_1_m[[variety]][[1]][1, 2],3)
+  slope_2 <- round(segment_1_m[[variety]][[1]][2, 1],3)
+  slope_2_se <- round(segment_1_m[[variety]][[1]][2, 2],3)
+  intercept_1 <- round(segment_1_b[[variety]][[1]][1],3)
+  intercept_2 <- round(segment_1_b[[variety]][[1]][2],3)
+  variety_output <- data.frame(variety, r_squared, breakpoint_1,  
+                      slope_1,  slope_2, intercept_1, intercept_2,
+                      breakpoint_1_se, slope_1_se, slope_2_se)
+  lat_50_output <- bind_rows(lat_50_output, variety_output)
+}
+
+not_50_output <- data.frame()
+for ( variety in not_50_varieties$Variety ) {
+  r_squared <- round(segment_2_r[[variety]], 3)
+  breakpoint_1 <- round(segment_2_psi[[variety]][1, 2],3)
+  breakpoint_1_se <- round(segment_2_psi[[variety]][1, 3],3)
+  breakpoint_2 <- round(segment_2_psi[[variety]][2, 2],3)
+  breakpoint_2_se <- round(segment_2_psi[[variety]][2, 3],3)
+  slope_1 <- round(segment_2_m[[variety]][[1]][1, 1],3)
+  slope_1_se <- round(segment_2_m[[variety]][[1]][1, 2],3)
+  slope_2 <- round(segment_2_m[[variety]][[1]][2, 1],3)
+  slope_2_se <- round(segment_2_m[[variety]][[1]][2, 2],3)
+  slope_3 <- round(segment_2_m[[variety]][[1]][3, 1],3)
+  slope_3_se <- round(segment_2_m[[variety]][[1]][3, 2],3)
+  intercept_1 <- round(segment_2_b[[variety]][[1]][1],3)
+  intercept_2 <- round(segment_2_b[[variety]][[1]][2],3)
+  intercept_3 <- round(segment_2_b[[variety]][[1]][3],3)
+  variety_output <- data.frame(variety, r_squared, breakpoint_1, breakpoint_2, 
+                               slope_1, slope_2,  slope_3,  
+                               intercept_1, intercept_2, intercept_3,
+                               breakpoint_1_se, breakpoint_2_se, slope_1_se,
+                               slope_2_se, slope_3_se)
+  not_50_output <- bind_rows(not_50_output, variety_output)
+}
+
+seg_output <- bind_rows(not_50_output, lat_50_output)
+seg_output <- left_join(latitude_variety, seg_output)
+write_csv(seg_output, "output/flowering_segment_analysis.csv")
 
 ### OTHER
 
 bb_sub <- flower_variety %>% 
-  filter(Variety == "HanFNQ", # PlantingDate == "May-22-2019",
+  filter(Variety == "Fibranova", # PlantingDate == "May-22-2019",
          !is.na(Induc_perc))
 
 ### nls
