@@ -196,7 +196,7 @@ not_50 <- flower_variety %>%
 
 not_50_varieties <- distinct(not_50, Variety)
 
-segment_1_r <- lat_50 %>%  
+segment_1_r <- flower_variety %>%  
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
@@ -208,9 +208,9 @@ segment_2_r <- not_50 %>%
   map(summary) %>% 
   map_dbl("r.squared")
 
-seg_results <- bind_rows(enframe(segment_1), enframe(segment_2))
+seg_results <- bind_rows(enframe(segment_1_r), enframe(segment_2_r))
 
-segment_1_psi <- lat_50  %>%
+segment_1_psi <- flower_variety  %>%
   split(.$Variety) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
@@ -224,11 +224,11 @@ segment_2_psi <- not_50 %>%
   transpose() %>% 
   pluck("psi")
 
-segment_1_m <- lat_50 %>%
+segment_1_m <- flower_variety %>%
   split(.$Variety) %>% 
   map(~slope(segmented(lm(Induc_perc ~ days_after, data = .))))
 
-segment_1_b <- lat_50 %>%
+segment_1_b <- flower_variety %>%
   split(.$Variety) %>% 
   map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .))))
 
@@ -244,8 +244,8 @@ seg_output <- data.frame(variety = c(), r_squared = c(),
                            breakpoint = c(), breakpoint_se = c(), 
                            slope = c(), slope_se =  c(), intercept = c())
 
-lat_50_output <- data.frame()
-for ( variety in lat_50_varieties$Variety ) {
+all_output <- data.frame()
+for ( variety in unique(flower_variety$Variety) ) {
   r_squared <- round(segment_1_r[[variety]], 3)
   breakpoint_1 <- round(segment_1_psi[[variety]][[2]],3)
   breakpoint_1_se <- round(segment_1_psi[[variety]][[3]],3)
@@ -258,7 +258,7 @@ for ( variety in lat_50_varieties$Variety ) {
   variety_output <- data.frame(variety, r_squared, breakpoint_1,  
                       slope_1,  slope_2, intercept_1, intercept_2,
                       breakpoint_1_se, slope_1_se, slope_2_se)
-  lat_50_output <- bind_rows(lat_50_output, variety_output)
+  all_output <- bind_rows(all_output, variety_output)
 }
 
 not_50_output <- data.frame()
@@ -285,9 +285,26 @@ for ( variety in not_50_varieties$Variety ) {
   not_50_output <- bind_rows(not_50_output, variety_output)
 }
 
-seg_output <- bind_rows(not_50_output, lat_50_output)
-seg_output <- left_join(latitude_variety, seg_output)
+seg_output <- bind_rows(not_50_output, all_output)
+seg_output <- left_join(latitude_variety, seg_output) %>% 
+  arrange(latitude, variety)
 write_csv(seg_output, "output/flowering_segment_analysis.csv")
+
+seg_sweep <- read_csv("output/flowering_segment_sweep.csv") %>% 
+  mutate(y_start = slope*x_start + intercept,
+         y_end = slope*(x_end-x_start) + y_start,
+         Variety = as.factor(variety),
+         Latitude = as.factor(latitude))
+
+ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
+  geom_point() +
+  geom_segment(data = seg_sweep, 
+               aes(x = x_start, y = y_start, xend = x_end, yend = y_end),
+               linetype="dashed", color="darkgrey") +
+  facet_wrap(~Latitude+Variety, dir="v") +
+  labs(x = "Days After Planting", y = "Flower Induction [%]") +
+  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 ### OTHER
 
