@@ -108,7 +108,7 @@ latitude_variety <- plots %>%
 flower_variety <- flower_data %>%
   filter(Experiment == "VarietyTrial") %>% 
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
-         days_after = as.numeric(Date - mdy("May-21-2019")))
+         days_after = as.numeric(Date - mdy("May-22-2019")))
 
 ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   geom_point() +
@@ -293,6 +293,8 @@ write_csv(seg_output, "output/flowering_segment_analysis.csv")
 seg_sweep <- read_csv("output/flowering_segment_sweep.csv") %>% 
   mutate(y_start = slope*x_start + intercept,
          y_end = slope*(x_end-x_start) + y_start,
+         fifty_day =  round((50 - intercept)/slope, 0),
+         fifty_date = mdy("May-22-2019") + fifty_day,
          Variety = as.factor(variety),
          Latitude = as.factor(latitude))
 
@@ -300,11 +302,20 @@ ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
   geom_point() +
   geom_segment(data = seg_sweep, 
                aes(x = x_start, y = y_start, xend = x_end, yend = y_end),
-               linetype="dashed", color="darkgrey") +
+               linetype="solid", color="darkgrey", size = 1.5) +
+  geom_point(data = seg_sweep, aes(x = x_start, y = y_start), color = "orange") +
+  geom_point(data = seg_sweep, aes(x = fifty_day, y = 50), color = "blue") +
+  geom_point(data = seg_sweep, aes(x = x_end, y = y_end), color = "orange") +
+  geom_text(data = seg_sweep, 
+            aes(x = 80, y = 80, 
+                label = paste0(month(fifty_date, label=TRUE), "-", day(fifty_date))),
+            color = "blue", label.size = 6,  fontface = "bold") +
+  scale_x_continuous(breaks = seq(20, 120, by = 15)) +
   facet_wrap(~Latitude+Variety, dir="v") +
   labs(x = "Days After Planting", y = "Flower Induction [%]") +
-  theme_bw(base_size = 12, base_family = "Helvetica") +
+  theme_bw(base_size = 10, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/flower_variety_segment.png", width = 6, height = 6, unit = "in")
 
 ### OTHER
 
