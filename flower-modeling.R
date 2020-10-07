@@ -53,34 +53,44 @@ flower_data <- collect_data("Flowering")
 
 #### Pilot breakpoint
 
-latitude_pilot <- plots %>% 
-  filter(Experiment == "PilotPlot1") %>%
-  select(latitude = Latitude, variety = Variety) %>% 
-  distinct(latitude, variety) %>% 
-  arrange(latitude)
-
 flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
          PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
          Variety = factor(Variety, variety_levels, variety_labels),
-         days_after = Date - mdy(PlantingDate),
+         days_after = as.numeric((Date - mdy(PlantingDate))),
          variety_date = paste0(Variety, PlantingDate))
 
+latitude_pilot <- flower_pilot %>% 
+  select(latitude = Latitude, variety = Variety, 
+         planting_date = PlantingDate, variety_date) %>% 
+  distinct(latitude, variety, planting_date, variety_date) %>% 
+  arrange(latitude)
 
 seg1s <- flower_pilot %>% 
   filter(Variety %in% c("Yuma-2", "Puma-3", "Bama",
-                        "Eletta", "Tygra", "CarmagnolaSelezionata"))
+                        "Eletta", "Tygra", "Carmag. Sel."))
 
 seg1s_varieties <- distinct(seg1s, variety_date)
 
+seg1s_extra <- flower_pilot %>%
+  filter(variety_date %in% c("CherryBlos. xTIJuly-18-2019", "BerryBlossomJuly-18-2019"))
+
+seg1s_varieties_extra <- distinct(seg1s_extra, variety_date)
+
 seg2s <- flower_pilot %>% 
-  filter(Variety %in% c("BerryBlossom", "CherryBlossomxTI"))
+  filter(Variety %in% c("BerryBlossom", "CherryBlos. xTI"))
 
 seg2s_varieties <- distinct(seg2s, variety_date)
 
 
 segment_1_r <- seg1s %>%
+  split(.$variety_date) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  map_dbl("r.squared")
+
+segment_1_e_r <- seg1s_extra %>%
   split(.$variety_date) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
   map(summary) %>% 
@@ -101,6 +111,13 @@ segment_1_psi <- seg1s  %>%
   transpose() %>% 
   pluck("psi")
 
+segment_1_e_psi <- seg1s_extra  %>%
+  split(.$variety_date) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  transpose() %>% 
+  pluck("psi")
+
 segment_2_psi <- seg2s %>% 
   split(.$variety_date) %>% 
   map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
@@ -112,7 +129,15 @@ segment_1_m <- seg1s %>%
   split(.$variety_date) %>% 
   map(~slope(segmented(lm(Induc_perc ~ days_after, data = .))))
 
+segment_1_e_m <- seg1s_extra %>%
+  split(.$variety_date) %>% 
+  map(~slope(segmented(lm(Induc_perc ~ days_after, data = .))))
+
 segment_1_b <- seg1s %>%
+  split(.$variety_date) %>% 
+  map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .))))
+
+segment_1_e_b <- seg1s_extra %>%
   split(.$variety_date) %>% 
   map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .))))
 
@@ -123,10 +148,6 @@ segment_2_m <- seg2s %>%
 segment_2_b <- seg2s %>%
   split(.$variety_date) %>% 
   map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
-
-seg_output <- data.frame(variety = c(), r_squared = c(),
-                         breakpoint = c(), breakpoint_se = c(), 
-                         slope = c(), slope_se =  c(), intercept = c())
 
 seg1s_output <- data.frame()
 for ( variety_date in unique(seg1s$variety_date) ) {
@@ -142,11 +163,28 @@ for ( variety_date in unique(seg1s$variety_date) ) {
   variety_output <- data.frame(variety_date, r_squared, breakpoint_1,  
                                slope_1,  slope_2, intercept_1, intercept_2,
                                breakpoint_1_se, slope_1_se, slope_2_se)
-  all_output <- bind_rows(seg1s_output, variety_output)
+  seg1s_output <- bind_rows(seg1s_output, variety_output)
+}
+
+seg1s_extra_output <- data.frame()
+for ( variety_date in unique(seg1s_extra$variety_date) ) {
+  r_squared <- round(segment_1_e_r[[variety_date]], 3)
+  breakpoint_1 <- round(segment_1_e_psi[[variety_date]][[2]],3)
+  breakpoint_1_se <- round(segment_1_e_psi[[variety_date]][[3]],3)
+  slope_1 <- round(segment_1_e_m[[variety_date]][[1]][1, 1],3)
+  slope_1_se <- round(segment_1_e_m[[variety_date]][[1]][1, 2],3)
+  slope_2 <- round(segment_1_e_m[[variety_date]][[1]][2, 1],3)
+  slope_2_se <- round(segment_1_e_m[[variety_date]][[1]][2, 2],3)
+  intercept_1 <- round(segment_1_e_b[[variety_date]][[1]][1],3)
+  intercept_2 <- round(segment_1_e_b[[variety_date]][[1]][2],3)
+  variety_output <- data.frame(variety_date, r_squared, breakpoint_1,  
+                               slope_1,  slope_2, intercept_1, intercept_2,
+                               breakpoint_1_se, slope_1_se, slope_2_se)
+  seg1s_extra_output <- bind_rows(seg1s_extra_output, variety_output)
 }
 
 seg2s_output <- data.frame()
-for ( variety_date in seg2s_varieties$variety_date ) {
+for ( variety_date in unique(seg2s$variety_date) ) {
   r_squared <- round(segment_2_r[[variety_date]], 3)
   breakpoint_1 <- round(segment_2_psi[[variety_date]][1, 2],3)
   breakpoint_1_se <- round(segment_2_psi[[variety_date]][1, 3],3)
@@ -169,21 +207,21 @@ for ( variety_date in seg2s_varieties$variety_date ) {
   seg2s_output <- bind_rows(seg2s_output, variety_output)
 }
 
-seg_output <- bind_rows(seg2s_output, seg1s_output)
+seg_output <- bind_rows(seg2s_output, seg1s_output, seg1s_extra_output)
 seg_output <- left_join(latitude_pilot, seg_output) %>% 
   arrange(latitude, variety_date)
-write_csv(seg_output, "output/flowering_segment_analysis.csv")
+write_csv(seg_output, "output/pilot_segment_analysis.csv")
 # Have to choose the segments in the breakpoint analysis to visualize.
 
-seg_sweep <- read_csv("output/flowering_segment_sweep.csv") %>% 
+seg_sweep <- read_csv("output/pilot_segment_sweep.csv") %>% 
   mutate(y_start = slope*x_start + intercept,
          y_end = slope*(x_end-x_start) + y_start,
          fifty_day =  round((50 - intercept)/slope, 0),
          fifty_date = mdy("May-22-2019") + fifty_day,
          Variety = as.factor(variety),
-         Latitude = as.factor(latitude))
+         PlantingDate = as.factor(planting_date))
 
-ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
+ggplot(flower_pilot, aes(x=days_after, y=Induc_perc)) +
   geom_point() +
   geom_segment(data = seg_sweep, 
                aes(x = x_start, y = y_start, xend = x_end, yend = y_end),
@@ -192,11 +230,10 @@ ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
   geom_point(data = seg_sweep, aes(x = fifty_day, y = 50), color = "blue") +
   geom_point(data = seg_sweep, aes(x = x_end, y = y_end), color = "orange") +
   geom_text(data = seg_sweep, 
-            aes(x = 80, y = 80, 
-                label = paste0(month(fifty_date, label=TRUE), "-", day(fifty_date))),
-            color = "blue", label.size = 6,  fontface = "bold") +
-  scale_x_continuous(breaks = seq(20, 120, by = 15)) +
-  facet_wrap(~Latitude+Variety, dir="v") +
+            aes(x = 90, y = 70, label = fifty_day),
+            color = "blue", fontface = "bold") +
+  scale_x_continuous(limits = c(10, 140), breaks = seq(20, 120, by = 20)) +
+  facet_grid(Variety~PlantingDate, scales = "free_x") +
   labs(x = "Days After Planting", y = "Flower Induction [%]") +
   theme_bw(base_size = 10, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -270,10 +307,6 @@ segment_2_m <- not_50 %>%
 segment_2_b <- not_50 %>%
   split(.$Variety) %>% 
   map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
-
-seg_output <- data.frame(variety = c(), r_squared = c(),
-                           breakpoint = c(), breakpoint_se = c(), 
-                           slope = c(), slope_se =  c(), intercept = c())
 
 all_output <- data.frame()
 for ( variety in unique(flower_variety$Variety) ) {
