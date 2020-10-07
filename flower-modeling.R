@@ -51,54 +51,161 @@ experiment_labels_full <- c("May-01-2019", "May-22-2019", "June-21-2019", "July-
 ### Data
 flower_data <- collect_data("Flowering")
 
-#### Pilot
+#### Pilot breakpoint
+
+latitude_pilot <- plots %>% 
+  filter(Experiment == "PilotPlot1") %>%
+  select(latitude = Latitude, variety = Variety) %>% 
+  distinct(latitude, variety) %>% 
+  arrange(latitude)
+
 flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
          PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
          Variety = factor(Variety, variety_levels, variety_labels),
-         days_after = Date - mdy(PlantingDate))
+         days_after = Date - mdy(PlantingDate),
+         variety_date = paste0(Variety, PlantingDate))
 
-flower_induc_pilot_blocks_10 <- flower_pilot %>%
-  filter(Induc_perc >= 10) %>%
-  mutate(day_interval = Date - mdy(PlantingDate)) %>% 
-  group_by(PlantingDate, Variety, Block) %>% 
-  summarize(induc_interval = min(day_interval))
 
-flower_induc_pilot_10 <- flower_induc_pilot_blocks_10 %>% 
-  group_by(PlantingDate, Variety) %>%  
-  summarize(avg_induc_interval_10 = mean(induc_interval),
-            induc_date_10 = min(mdy(PlantingDate)) + days(round(avg_induc_interval_10, 0)),
-            sd_induc_interval_10 = sd(as.numeric(induc_interval))) %>% 
-  arrange(induc_date_10)
+seg1s <- flower_pilot %>% 
+  filter(Variety %in% c("Yuma-2", "Puma-3", "Bama",
+                        "Eletta", "Tygra", "CarmagnolaSelezionata"))
 
-flower_induc_pilot_blocks_50 <- flower_pilot %>%
-  filter(Induc_perc >= 50) %>%
-  mutate(day_interval = Date - mdy(PlantingDate)) %>% 
-  group_by(PlantingDate, Variety, Block) %>% 
-  summarize(induc_interval = min(day_interval))
+seg1s_varieties <- distinct(seg1s, variety_date)
 
-flower_induc_pilot_50 <- flower_induc_pilot_blocks_50 %>% 
-  group_by(PlantingDate, Variety) %>%  
-  summarize(avg_induc_interval_50 = mean(induc_interval),
-            induc_date_50 = min(mdy(PlantingDate)) + days(round(avg_induc_interval_50, 0)),
-            sd_induc_interval_50 = sd(as.numeric(induc_interval))) %>% 
-  arrange(induc_date_50)
+seg2s <- flower_pilot %>% 
+  filter(Variety %in% c("BerryBlossom", "CherryBlossomxTI"))
 
-flower_induc_pilot <- left_join(flower_induc_pilot_10, flower_induc_pilot_50)
-#write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
+seg2s_varieties <- distinct(seg2s, variety_date)
 
-ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
+
+segment_1_r <- seg1s %>%
+  split(.$variety_date) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  map_dbl("r.squared")
+
+segment_2_r <- seg2s %>% 
+  split(.$variety_date) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
+  map(summary) %>% 
+  map_dbl("r.squared")
+
+seg_results <- bind_rows(enframe(segment_1_r), enframe(segment_2_r))
+
+segment_1_psi <- seg1s  %>%
+  split(.$variety_date) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .))) %>% 
+  map(summary) %>% 
+  transpose() %>% 
+  pluck("psi")
+
+segment_2_psi <- seg2s %>% 
+  split(.$variety_date) %>% 
+  map(~ segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)) %>% 
+  map(summary) %>% 
+  transpose() %>% 
+  pluck("psi")
+
+segment_1_m <- seg1s %>%
+  split(.$variety_date) %>% 
+  map(~slope(segmented(lm(Induc_perc ~ days_after, data = .))))
+
+segment_1_b <- seg1s %>%
+  split(.$variety_date) %>% 
+  map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .))))
+
+segment_2_m <- seg2s %>%
+  split(.$variety_date) %>% 
+  map(~slope(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
+
+segment_2_b <- seg2s %>%
+  split(.$variety_date) %>% 
+  map(~intercept(segmented(lm(Induc_perc ~ days_after, data = .), npsi=2)))
+
+seg_output <- data.frame(variety = c(), r_squared = c(),
+                         breakpoint = c(), breakpoint_se = c(), 
+                         slope = c(), slope_se =  c(), intercept = c())
+
+seg1s_output <- data.frame()
+for ( variety_date in unique(seg1s$variety_date) ) {
+  r_squared <- round(segment_1_r[[variety_date]], 3)
+  breakpoint_1 <- round(segment_1_psi[[variety_date]][[2]],3)
+  breakpoint_1_se <- round(segment_1_psi[[variety_date]][[3]],3)
+  slope_1 <- round(segment_1_m[[variety_date]][[1]][1, 1],3)
+  slope_1_se <- round(segment_1_m[[variety_date]][[1]][1, 2],3)
+  slope_2 <- round(segment_1_m[[variety_date]][[1]][2, 1],3)
+  slope_2_se <- round(segment_1_m[[variety_date]][[1]][2, 2],3)
+  intercept_1 <- round(segment_1_b[[variety_date]][[1]][1],3)
+  intercept_2 <- round(segment_1_b[[variety_date]][[1]][2],3)
+  variety_output <- data.frame(variety_date, r_squared, breakpoint_1,  
+                               slope_1,  slope_2, intercept_1, intercept_2,
+                               breakpoint_1_se, slope_1_se, slope_2_se)
+  all_output <- bind_rows(seg1s_output, variety_output)
+}
+
+seg2s_output <- data.frame()
+for ( variety_date in seg2s_varieties$variety_date ) {
+  r_squared <- round(segment_2_r[[variety_date]], 3)
+  breakpoint_1 <- round(segment_2_psi[[variety_date]][1, 2],3)
+  breakpoint_1_se <- round(segment_2_psi[[variety_date]][1, 3],3)
+  breakpoint_2 <- round(segment_2_psi[[variety_date]][2, 2],3)
+  breakpoint_2_se <- round(segment_2_psi[[variety_date]][2, 3],3)
+  slope_1 <- round(segment_2_m[[variety_date]][[1]][1, 1],3)
+  slope_1_se <- round(segment_2_m[[variety_date]][[1]][1, 2],3)
+  slope_2 <- round(segment_2_m[[variety_date]][[1]][2, 1],3)
+  slope_2_se <- round(segment_2_m[[variety_date]][[1]][2, 2],3)
+  slope_3 <- round(segment_2_m[[variety_date]][[1]][3, 1],3)
+  slope_3_se <- round(segment_2_m[[variety_date]][[1]][3, 2],3)
+  intercept_1 <- round(segment_2_b[[variety_date]][[1]][1],3)
+  intercept_2 <- round(segment_2_b[[variety_date]][[1]][2],3)
+  intercept_3 <- round(segment_2_b[[variety_date]][[1]][3],3)
+  variety_output <- data.frame(variety_date, r_squared, breakpoint_1, breakpoint_2, 
+                               slope_1, slope_2,  slope_3,  
+                               intercept_1, intercept_2, intercept_3,
+                               breakpoint_1_se, breakpoint_2_se, slope_1_se,
+                               slope_2_se, slope_3_se)
+  seg2s_output <- bind_rows(seg2s_output, variety_output)
+}
+
+seg_output <- bind_rows(seg2s_output, seg1s_output)
+seg_output <- left_join(latitude_pilot, seg_output) %>% 
+  arrange(latitude, variety_date)
+write_csv(seg_output, "output/flowering_segment_analysis.csv")
+# Have to choose the segments in the breakpoint analysis to visualize.
+
+seg_sweep <- read_csv("output/flowering_segment_sweep.csv") %>% 
+  mutate(y_start = slope*x_start + intercept,
+         y_end = slope*(x_end-x_start) + y_start,
+         fifty_day =  round((50 - intercept)/slope, 0),
+         fifty_date = mdy("May-22-2019") + fifty_day,
+         Variety = as.factor(variety),
+         Latitude = as.factor(latitude))
+
+ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
   geom_point() +
-  geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date_50), linetype="dashed") +
-  facet_grid(Variety~PlantingDate) +  # scales = "free_x"
-  labs(x = "Date", y = "Flower Induction [%]") +
-  theme_bw(base_size = 12, base_family = "Helvetica") +
+  geom_segment(data = seg_sweep, 
+               aes(x = x_start, y = y_start, xend = x_end, yend = y_end),
+               linetype="solid", color="darkgrey", size = 1.5) +
+  geom_point(data = seg_sweep, aes(x = x_start, y = y_start), color = "orange") +
+  geom_point(data = seg_sweep, aes(x = fifty_day, y = 50), color = "blue") +
+  geom_point(data = seg_sweep, aes(x = x_end, y = y_end), color = "orange") +
+  geom_text(data = seg_sweep, 
+            aes(x = 80, y = 80, 
+                label = paste0(month(fifty_date, label=TRUE), "-", day(fifty_date))),
+            color = "blue", label.size = 6,  fontface = "bold") +
+  scale_x_continuous(breaks = seq(20, 120, by = 15)) +
+  facet_wrap(~Latitude+Variety, dir="v") +
+  labs(x = "Days After Planting", y = "Flower Induction [%]") +
+  theme_bw(base_size = 10, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
-#ggsave("output/flower_pilot.png")
+ggsave("output/flower_pilot_segment.png", width = 6, height = 6, unit = "in")
 
 
-#### Variety
+
+#### Variety breakpoint
+
 latitude_variety <- plots %>% 
   filter(Experiment == "VarietyTrial") %>%
   select(latitude = Latitude, variety = Variety) %>% 
@@ -109,82 +216,6 @@ flower_variety <- flower_data %>%
   filter(Experiment == "VarietyTrial") %>% 
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
          days_after = as.numeric(Date - mdy("May-22-2019")))
-
-ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
-  geom_point() +
-  facet_wrap(~Variety) +
-  labs(x = "Date", y = "Flower Induction [%]") +
-  theme_bw(base_size = 12, base_family = "Helvetica") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-#ggsave("output/flower_variety.png")
-
-flower_induc_variety_blocks_10 <- flower_variety %>% 
-  filter(Induc_perc >=10) %>%
-  mutate(day_interval = Date - ymd("2019-May-22")) %>% 
-  group_by(Latitude, Variety, Block, Row) %>% 
-  summarize(induc_interval = min(day_interval)) 
-
-flower_induc_variety_10 <- flower_induc_variety_blocks_10 %>%
-  group_by(Latitude, Variety) %>%  
-  summarize(avg_induc_interval_10 = mean(induc_interval),
-            induc_date_10 = ymd("2019-May-22") + days(round(avg_induc_interval_10, 0)),
-            sd_induc_interval_10 = sd(as.numeric(induc_interval))) %>% 
-  arrange(induc_date_10)
-
-flower_induc_variety_blocks_50 <- flower_variety %>% 
-  filter(Induc_perc >=50) %>%
-  mutate(day_interval = Date - ymd("2019-May-22")) %>% 
-  group_by(Latitude, Variety, Block, Row) %>% 
-  summarize(induc_interval = min(day_interval)) 
-
-flower_induc_variety_50 <- flower_induc_variety_blocks_50 %>%
-  group_by(Latitude, Variety) %>%  
-  summarize(avg_induc_interval_50 = mean(induc_interval),
-            induc_date_50 = ymd("2019-May-22") + days(round(avg_induc_interval_50, 0)),
-            sd_induc_interval_50 = sd(as.numeric(induc_interval))) %>% 
-  arrange(induc_date_50)
-
-flower_induc_variety <- left_join(flower_induc_variety_10, flower_induc_variety_50)
-#write_csv(flower_induc_variety, "output/flower_induc_variety.csv")
-
-ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
-  geom_point() +
-  geom_vline(data=flower_induc_variety, aes(xintercept = induc_date_50), 
-             linetype="dashed", color="darkgrey") +
-  facet_wrap(~Latitude+Variety, dir="v") +
-  labs(x = "Date", y = "Flower Induction [%]") +
-  theme_bw(base_size = 12, base_family = "Helvetica") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-#ggsave("output/flower_variety_class.png")
-
-flower_induc_class <- flower_induc_variety %>%
-  group_by(Latitude) %>%  
-  summarize(Avg_induc_interval = mean(avg_induc_interval_50),
-            Induc_date = ymd("2019-May-22") + days(round(Avg_induc_interval, 0)),
-            Sd_induc_interval = sd(as.numeric(avg_induc_interval_50))) %>% 
-  arrange(Induc_date)
-#write_csv(flower_induc_variety, "output/flower_induc_class.csv")
-
-ggplot(flower_variety, aes(x=Date, y=Induc_perc, shape = as.ordered(Latitude))) +
-  geom_point() +
-  geom_vline(data=flower_induc_class, aes(xintercept = Induc_date), linetype="dotted") +
-  labs(x = "Date", y = "Flower Induction [%]", shape = "Latitutde") +
-  scale_shape_manual(values = c(9,7,1,5,0,2)) +
-  theme_bw(base_size = 12, base_family = "Helvetica") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-#ggsave("output/flower_class.png")
-
-flower_female_pilot <- flower_pilot %>%
-  filter(FemaleOpen_perc == 100) %>%
-  group_by(Experiment, Variety) %>% 
-  summarize(female_date = min(Date)) 
-
-flower_male_pilot <- flower_pilot %>%
-  filter(MaleOpen_perc == 100) %>%
-  group_by(Experiment, Variety) %>% 
-  summarize(male_date = min(Date)) 
-
-### Models
 
 lat_50 <- flower_variety %>% 
   filter(Latitude == 50)
@@ -289,6 +320,7 @@ seg_output <- bind_rows(not_50_output, all_output)
 seg_output <- left_join(latitude_variety, seg_output) %>% 
   arrange(latitude, variety)
 write_csv(seg_output, "output/flowering_segment_analysis.csv")
+  # Have to choose the segments in the breakpoint analysis to visualize.
 
 seg_sweep <- read_csv("output/flowering_segment_sweep.csv") %>% 
   mutate(y_start = slope*x_start + intercept,
@@ -317,7 +349,7 @@ ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_variety_segment.png", width = 6, height = 6, unit = "in")
 
-### OTHER
+### END
 
 bb_sub <- flower_variety %>% 
   filter(Variety == "Fibranova", # PlantingDate == "May-22-2019",
