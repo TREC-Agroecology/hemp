@@ -217,7 +217,7 @@ seg_sweep <- read_csv("output/pilot_segment_sweep.csv") %>%
   mutate(y_start = slope*x_start + intercept,
          y_end = slope*(x_end-x_start) + y_start,
          fifty_day =  round((50 - intercept)/slope, 0),
-         fifty_date = mdy("May-22-2019") + fifty_day,
+         fifty_date = mdy(planting_date) + fifty_day,
          Variety = as.factor(variety),
          PlantingDate = as.factor(planting_date))
 
@@ -239,7 +239,23 @@ ggplot(flower_pilot, aes(x=days_after, y=Induc_perc)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_pilot_segment.png", width = 6, height = 6, unit = "in")
 
-
+ggplot(flower_pilot, aes(x=days_after, y=Induc_perc)) +
+  geom_point() +
+  geom_segment(data = seg_sweep, 
+               aes(x = x_start, y = y_start, xend = x_end, yend = y_end),
+               linetype="solid", color="darkgrey", size = 1.5) +
+  geom_point(data = seg_sweep, aes(x = x_start, y = y_start), color = "orange") +
+  geom_point(data = seg_sweep, aes(x = fifty_day, y = 50), color = "blue") +
+  geom_point(data = seg_sweep, aes(x = x_end, y = y_end), color = "orange") +
+  geom_text(data = seg_sweep, 
+            aes(x = 90, y = 70, label = paste0(month(fifty_date, label=TRUE),"-", day(fifty_date))),
+            color = "blue", fontface = "bold") +
+  scale_x_continuous(limits = c(10, 140), breaks = seq(20, 120, by = 20)) +
+  facet_grid(Variety~PlantingDate, scales = "free_x") +
+  labs(x = "Days After Planting", y = "Flower Induction [%]") +
+  theme_bw(base_size = 10, base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+ggsave("output/flower_pilot_segment_date.png", width = 6, height = 6, unit = "in")
 
 #### Variety breakpoint
 
