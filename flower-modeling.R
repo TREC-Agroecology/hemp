@@ -1,6 +1,5 @@
 ### REMINDER. Set working directory.
 
-library(brms)
 library(tidyverse)
 library(lubridate)
 library(segmented)
@@ -377,7 +376,7 @@ seg_sweep <- read_csv("output/flowering_segment_sweep.csv") %>%
          fifty_day =  round((50 - intercept)/slope, 0),
          fifty_date = mdy("May-22-2019") + fifty_day,
          Variety = as.factor(variety),
-         Latitude = as.factor(latitude))
+         Latitude = latitude)
 
 ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
   geom_point() +
@@ -390,7 +389,7 @@ ggplot(flower_variety, aes(x=days_after, y=Induc_perc)) +
   geom_text(data = seg_sweep, 
             aes(x = 80, y = 80, 
                 label = paste0(month(fifty_date, label=TRUE), "-", day(fifty_date))),
-            color = "blue", label.size = 6,  fontface = "bold") +
+            color = "blue", fontface = "bold") +
   scale_x_continuous(breaks = seq(20, 120, by = 15)) +
   facet_wrap(~Latitude+Variety, dir="v") +
   labs(x = "Days After Planting", y = "Flower Induction [%]") +
@@ -417,6 +416,7 @@ michaelis_fit <- nls(Induc_perc ~ (a * days_after) / (b + days_after),
 
 
 ### brms
+library(brms)
 
 #### Tutorial
 b <- c(2, 0.75)
