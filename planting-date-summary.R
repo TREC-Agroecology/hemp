@@ -3,6 +3,8 @@
 library(tidyverse)
 library(lubridate)
 library(agricolae)
+library(drc)
+library(nlme)
 
 collect_data <- function(data_name, experiment_names = dates$Experiment, plot_info = plots){
   data_name_tag <- paste0(".*", data_name, ".csv") 
@@ -142,7 +144,8 @@ flower_pilot <- flower_data %>%
   filter(Variety %in% planting_date_varieties$Variety) %>%
   mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
          PlantingDate = factor(Experiment, experiment_levels, experiment_labels_full),
-         Variety = factor(Variety, variety_levels, variety_labels))
+         Variety = factor(Variety, variety_levels, variety_labels),
+         days_after = Date - mdy(PlantingDate))
 
 flower_induc_pilot_blocks_10 <- flower_pilot %>%
   filter(Induc_perc >= 10) %>%
@@ -175,17 +178,38 @@ write_csv(flower_induc_pilot, "output/flower_induc_pilot.csv")
 
 ggplot(flower_pilot, aes(x=Date, y=Induc_perc)) +
   geom_point() +
-  geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date), linetype="dashed") +
+  geom_vline(data=flower_induc_pilot, aes(xintercept = induc_date_50), linetype="dashed") +
   facet_grid(Variety~PlantingDate) +  # scales = "free_x"
   labs(x = "Date", y = "Flower Induction [%]") +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_pilot.png")
 
+bb_sub <- flower_pilot %>% 
+  filter(Variety == "BerryBlossom", PlantingDate == "May-22-2019",
+         !is.na(Induc_perc))
+sigmoid_fit <- nls(Induc_perc ~ b/(1 + exp(-c * (as.numeric(days_after) - d))),
+                   data = bb_sub,
+                   start = list(b = 101, c = 1, d = 50))
+sigmoid_start <- nls(Induc_perc ~ SSgompertz(as.numeric(days_after), 101, 0.1, 101),
+                     data = bb_sub)
+exponent_fit <- nls(Induc_perc ~ a * (exp(k * as.numeric(days_after))), 
+                    data = bb_sub,
+                    start = list(a = 0.1, k = 0.1))
+lm(Induc_perc ~ exp(as.numeric(days_after)), data = bb_sub)
+
+
+for (var in flower_pilot$Variety){
+  for (day in flower_pilot$PlantingDate){
+    sigmoid_test <- "Hello World"
+  }
+}
+
 #### Variety flowering
 flower_variety <- flower_data %>%
   filter(Experiment == "VarietyTrial") %>% 
-  mutate(Date = ymd(paste(Year, Month, Day, sep="-")))
+  mutate(Date = ymd(paste(Year, Month, Day, sep="-")),
+         days_after = Date - mdy("May-21-2019"))
 
 ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   geom_point() +
@@ -194,6 +218,16 @@ ggplot(flower_variety, aes(x=Date, y=Induc_perc)) +
   theme_bw(base_size = 12, base_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("output/flower_variety.png")
+
+flower_variety %>%
+  split(.$Variety) %>%
+  map(~ safely(
+    nls(Induc_perc ~ b/(1 + exp(-c * (as.numeric(days_after) - d))),
+        data = .,
+        start = list(b = 101, c = 1, d = 50))),
+    otherwise = NA_real_) %>%
+  map(summary) 
+
 
 flower_induc_variety_blocks_10 <- flower_variety %>% 
   filter(Induc_perc >=10) %>%
