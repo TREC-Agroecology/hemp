@@ -1,4 +1,4 @@
-Year,Month,Day,Block,Row,Column,NumberOfPlants,BiomasWeight_kg),GrainFreshWeight_g,GrainDryWeight_g,CleanedHarvest_g,RootWeight_g
+Year,Month,Day,Block,Row,Column,NumberOfPlants,BiomassWeight_kg,GrainFreshWeight_g,GrainDryWeight_g,CleanedHarvest_g,RootWeight_g
 2019,8,14,3,1,D,40,390,69,45,37,33
 2019,8,14,4,4,A,35,1299,291,191,,130
 2019,8,14,1,2,D,46,1275,288,183,,150
