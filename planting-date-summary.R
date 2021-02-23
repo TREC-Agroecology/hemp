@@ -334,11 +334,13 @@ grain_pilot <- grain_data %>%
 grain_summary <- grain_data %>%
   group_by(Variety, Experiment) %>% 
   mutate(grain_harvest_lbsac = GrainDryWeight_g*8.92,  
-         grain_fresh_lbsac = GrainFreshWeight_g*8.92) %>% 
+         grain_fresh_lbsac = GrainFreshWeight_g*8.92,
+         biomass_dry_lbsac = BiomassWeight_kg*8.92) %>% #Data in g???
   summarize(avg_grain_harvest = mean(grain_harvest_lbsac, na.rm=TRUE),
             sd_grain_harvest = sd(grain_harvest_lbsac, na.rm=TRUE),
             avg_grain_dry = mean(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down,
-            sd_grain_dry = sd(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down) %>%
+            sd_grain_dry = sd(grain_fresh_lbsac, na.rm=TRUE)*grain_dry_down$dry_down,
+            avg_straw_dry = mean(biomass_dry_lbsac, na.rm=TRUE)*0.438) %>%
   ungroup() %>% 
   mutate(PlantingDate = factor(Experiment, experiment_levels, experiment_labels),
          Variety = str_replace_all(Variety, "CarmagnolaSelezionata", "Carmag. Sel."))
